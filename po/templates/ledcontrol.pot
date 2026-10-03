@@ -1,0 +1,26 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:29
+msgid "LED Control"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:30
+msgid "Turn all system LEDs on or off with a single switch."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:32
+msgid "Global Settings"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:36
+msgid "Enable LEDs"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:37
+msgid "Controls the status of LEDs. Settings take effect immediately and will persist after a reboot (ON or OFF)."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:79
+msgid "Failed to apply the LED settings: %s"
+msgstr ""

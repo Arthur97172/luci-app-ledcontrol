@@ -1,0 +1,17 @@
+{
+	"luci-app-ledcontrol": {
+		"description": "Grant access to the LED control configuration",
+		"read": {
+			"ubus": {
+				"rc": [ "list" ]
+			},
+			"uci": [ "ledcontrol" ]
+		},
+		"write": {
+			"ubus": {
+				"rc": [ "init" ]
+			},
+			"uci": [ "ledcontrol" ]
+		}
+	}
+}

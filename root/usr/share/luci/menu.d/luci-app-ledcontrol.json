@@ -1,0 +1,13 @@
+{
+	"admin/system/ledcontrol": {
+		"title": "LED Control",
+		"order": 61,
+		"action": {
+			"type": "view",
+			"path": "ledcontrol"
+		},
+		"depends": {
+			"acl": [ "luci-app-ledcontrol" ]
+		}
+	}
+}

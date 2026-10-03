@@ -1,0 +1,57 @@
+#!/bin/sh /etc/rc.common
+#
+# Copyright (C) 2026 Arthur97172 <arthur97172@outlook.com>
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# ledcontrol - force the state of every LED exposed through /sys/class/leds.
+#
+# START=99 makes this script run as the very last service during boot, i.e.
+# after the kernel LED triggers, the board specific default LED configuration
+# and every hardware driver have been initialised. Running any earlier would
+# let the vendor defaults overwrite the state we set here.
+
+START=99
+STOP=10
+USE_PROCD=1
+
+LED_CLASS_DIR="/sys/class/leds"
+
+led_apply() {
+	local value="$1"
+	local led
+
+	for led in "$LED_CLASS_DIR"/*; do
+		[ -e "$led/brightness" ] || continue
+		echo "$value" > "$led/brightness" 2>/dev/null
+	done
+}
+
+start_service() {
+	local enable
+
+	config_load ledcontrol
+	config_get enable global enable '1'
+
+	case "$enable" in
+		0)
+			logger -t ledcontrol "turning all system LEDs off"
+			led_apply 0
+			;;
+		*)
+			logger -t ledcontrol "turning all system LEDs on"
+			led_apply 1
+			;;
+	esac
+}
+
+stop_service() {
+	led_apply 1
+}
+
+reload_service() {
+	start_service
+}
+
+service_triggers() {
+	procd_add_reload_trigger "ledcontrol"
+}

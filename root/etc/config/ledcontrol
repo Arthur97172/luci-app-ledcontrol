@@ -1,0 +1,2 @@
+config ledset 'global'
+	option enable '1'
