@@ -1,2 +1,2 @@
-config ledset 'global'
+config ledcontrol 'global'
 	option enable '1'
