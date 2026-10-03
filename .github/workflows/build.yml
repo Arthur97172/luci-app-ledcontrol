@@ -1,0 +1,189 @@
+name: Build
+
+# The release job writes to the repository, so the token needs write access.
+# A workflow level grant cannot be narrowed per job, so what keeps the release
+# job from running on a pull request is its own `if` guard further down.
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+# Serialise runs for the same ref: two runs racing to create the same release
+# tag would otherwise collide.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: luci-app-ledcontrol
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Compile in parallel: one runner for the opkg (.ipk) SDK, one for the
+  # apk (.apk) SDK.
+  # ---------------------------------------------------------------------------
+  build:
+    name: ${{ matrix.artifact }}
+    runs-on: ubuntu-22.04
+
+    strategy:
+      # One leg failing must not cancel the other, so a single good package
+      # still reaches the release.
+      fail-fast: false
+      matrix:
+        include:
+          - artifact: ipk
+            sdk_url: https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/openwrt-sdk-24.10.8-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            pkg_ext: ipk
+          - artifact: apk
+            sdk_url: https://downloads.openwrt.org/releases/25.12.5/targets/x86/64/openwrt-sdk-25.12.5-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+            pkg_ext: apk
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          path: package-dir
+
+      # LUCI_PKGARCH:=all and no compiled code means a single target's SDK
+      # yields a package that installs on ARM, x86 and MIPS alike, so one
+      # x86/64 SDK per package format is enough.
+      - name: Download SDK
+        run: curl -sL --retry 5 --retry-delay 10 "${{ matrix.sdk_url }}" -o sdk.tar.zst
+
+      - name: Extract SDK
+        run: tar -xf sdk.tar.zst && mv openwrt-sdk-* sdk
+
+      - name: Copy package into the SDK
+        run: |
+          mkdir -p "sdk/package/${PACKAGE_NAME}"
+          rsync -a --exclude '.git' --exclude '.github' \
+            package-dir/ "sdk/package/${PACKAGE_NAME}/"
+
+      - name: Install feeds and configure
+        run: |
+          cd sdk
+          # 24.10 ships the base feed as a full clone; a shallow one is enough.
+          sed -e 's/^src-git-full /src-git /' feeds.conf.default > feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          # Only the one package: the Simplified Chinese catalog is compiled
+          # into it, so there is no luci-i18n-* package to select.
+          echo "CONFIG_PACKAGE_${PACKAGE_NAME}=m" >> .config
+          make defconfig
+
+      - name: Build package
+        run: |
+          cd sdk
+          make -j"$(nproc)" "package/${PACKAGE_NAME}/compile" V=s
+
+      - name: Collect packages
+        run: |
+          mkdir -p artifacts
+          # Just the built package. `make package/<name>/compile` stops before
+          # the index stage, so no Packages / APKINDEX is written under bin/ -
+          # those appear only after `make package/index` or a full image build.
+          find sdk/bin/ -type f \
+              -name "${PACKAGE_NAME}*.${{ matrix.pkg_ext }}" \
+              -exec cp {} artifacts/ \;
+          ls -lh artifacts/ || echo "(no ${{ matrix.pkg_ext }} packages)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: artifacts/
+          # A failed leg simply contributes nothing; the release job reports
+          # the overall outcome.
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Merge both legs and publish a Release whose tag and name are exactly the
+  # version declared in the Makefile. One source of truth, so the package
+  # version and the release tag cannot drift apart.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish release
+    needs: build
+    # Publish on pushes and manual runs only. A pull request must never be able
+    # to cut a release.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # PKG_VERSION:=1.0.2 together with PKG_RELEASE:=1 becomes the tag
+      # "1.0.2-r1". Bumping either in the Makefile produces a new tag on the
+      # next push, so the version is edited in exactly one place.
+      - name: Read version from Makefile
+        id: version
+        run: |
+          VER=$(sed -n 's/^PKG_VERSION:=//p' Makefile | tr -d '[:space:]')
+          REL=$(sed -n 's/^PKG_RELEASE:=//p' Makefile | tr -d '[:space:]')
+          PKGVER="${VER}-r${REL}"
+          echo "PKGVER=${PKGVER}" >> "$GITHUB_OUTPUT"
+          echo "package version: ${PKGVER}"
+
+      - name: Download ipk packages
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ipk
+          path: artifacts
+
+      - name: Download apk packages
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: apk
+          path: artifacts
+
+      - name: Verify packages
+        run: |
+          if ! ls artifacts/* >/dev/null 2>&1; then
+            echo "no packages were built - nothing to publish"
+            exit 1
+          fi
+          ls -lh artifacts/
+
+      # A published release is immutable, so drop any previous release and tag
+      # carrying this version first. That makes re-running the workflow for the
+      # same version idempotent rather than failing on a tag that already
+      # exists.
+      - name: Delete existing release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PKGVER="${{ steps.version.outputs.PKGVER }}"
+          gh release delete "$PKGVER" -y --cleanup-tag 2>/dev/null || true
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$PKGVER" 2>/dev/null || true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.PKGVER }}
+          name: ${{ steps.version.outputs.PKGVER }}
+          body: |
+            **包含 / Contents**
+            - `luci-app-ledcontrol` — 主程序包 / main package
+              内置简体中文与英文界面，无需单独安装语言包。
+              Simplified Chinese and English are built in; no separate
+              language package is needed.
+
+            **安装 / Install**
+            - `.ipk`（opkg）— OpenWrt / ImmortalWrt 24.10 及更早
+            - `.apk`（apk）— OpenWrt / ImmortalWrt 25.12+
+
+            架构 `all`：纯 JavaScript 与 shell，同一份产物适用于 ARM / x86 / MIPS。
+            Architecture `all`: pure JavaScript and shell, one artifact fits ARM / x86 / MIPS.
+          files: artifacts/*
+          token: ${{ github.token }}
+          make_latest: true
