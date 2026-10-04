@@ -46,19 +46,48 @@ is_net_led() {
 #        0           1    |      0      |     1     | only ports stay on
 #        1           0    |      1      |     0     | only ports go dark
 #        1           1    |      1      |     1     | everything on
+#
+# "On" is written as the LED's own max_brightness rather than a hard coded 1.
+# brightness is not a boolean: the LED class clamps writes to
+# [0, max_brightness] (led_set_brightness_nosleep), and a multicolor LED
+# scales every colour channel by brightness / max_brightness
+# (led_mc_calc_color_components). A plain GPIO LED has max_brightness 1, so it
+# is unaffected, but a PWM or RGB LED has 255 - writing 1 there is 1/255 of the
+# range, i.e. visually off. max_brightness is registered by the LED class for
+# every LED and the kernel forces it to LED_FULL when a driver leaves it 0
+# (led-class.c), so reading it is always safe.
+#
+# "Off" stays a literal 0: writing 0 is what makes the kernel detach the LED
+# trigger (led_trigger_remove), so a dark LED stays dark.
 led_apply() {
 	local status_value="$1"
 	local net_value="$2"
-	local led
+	local led value max
 
 	for led in "$LED_CLASS_DIR"/*; do
 		[ -e "$led/brightness" ] || continue
 
 		if is_net_led "${led##*/}"; then
-			echo "$net_value" > "$led/brightness" 2>/dev/null
+			value="$net_value"
 		else
-			echo "$status_value" > "$led/brightness" 2>/dev/null
+			value="$status_value"
 		fi
+
+		if [ "$value" = "0" ]; then
+			echo 0 > "$led/brightness" 2>/dev/null
+			continue
+		fi
+
+		max="$(cat "$led/max_brightness" 2>/dev/null)"
+
+		# Unreadable, non numeric or 0 - none of which the LED class should
+		# ever produce - fall back to 1 rather than writing 0, which would
+		# turn the LED off when it was asked to turn on.
+		case "$max" in
+			''|*[!0-9]*|0) max=1 ;;
+		esac
+
+		echo "$max" > "$led/brightness" 2>/dev/null
 	done
 }
 

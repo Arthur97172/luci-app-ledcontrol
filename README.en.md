@@ -48,13 +48,32 @@ covers all four combinations by construction:
 ```sh
 for led in /sys/class/leds/*; do
 	[ -e "$led/brightness" ] || continue
-	if is_net_led "${led##*/}"; then
-		echo "$net_value" > "$led/brightness"
+	if is_net_led "${led##*/}"; then value="$net_value"; else value="$status_value"; fi
+	if [ "$value" = "0" ]; then
+		echo 0 > "$led/brightness"
 	else
-		echo "$status_value" > "$led/brightness"
+		echo "$(cat "$led/max_brightness")" > "$led/brightness"
 	fi
 done
 ```
+
+**"On" is written as the LED's own `max_brightness`, not as a hard coded `1`.**
+`brightness` is not a boolean but a range of `0 … max_brightness`: a plain GPIO
+LED has `max_brightness` 1, where writing 1 is exactly equivalent, while a PWM
+or RGB LED typically has 255 - writing 1 there is 1/255 of the range, which is
+visually off. `max_brightness` is registered by the LED class for every LED,
+and the kernel forces it to `LED_FULL` when a driver leaves it 0, so reading it
+is always safe.
+
+**"Off" is always a literal 0.** Writing 0 is what makes the kernel detach the
+LED's trigger (`led_trigger_remove`), so a LED that was switched off is not lit
+up again by a `timer`, `heartbeat` or similar trigger. Writing a non-zero value
+does not touch the trigger, so "on" means **let the LED resume its normal
+behaviour** rather than force it steady - a port LED driven by the `netdev`
+trigger keeps blinking with traffic. Because switching off detaches the
+trigger, an off/on cycle does not bring it back; **a reboot does** (the board
+LED configuration re-attaches triggers during boot, and `START=99` then applies
+the state you chose).
 
 The keyword test uses POSIX `case` patterns rather than the bash
 `[[ "$i" =~ "wan" ]]` operator: `/bin/sh` on OpenWrt and ImmortalWrt is busybox

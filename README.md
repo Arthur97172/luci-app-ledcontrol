@@ -45,13 +45,27 @@ init 脚本对每个 LED 写入它所属开关的值，四种组合由此自然�
 ```sh
 for led in /sys/class/leds/*; do
 	[ -e "$led/brightness" ] || continue
-	if is_net_led "${led##*/}"; then
-		echo "$net_value" > "$led/brightness"
+	if is_net_led "${led##*/}"; then value="$net_value"; else value="$status_value"; fi
+	if [ "$value" = "0" ]; then
+		echo 0 > "$led/brightness"
 	else
-		echo "$status_value" > "$led/brightness"
+		echo "$(cat "$led/max_brightness")" > "$led/brightness"
 	fi
 done
 ```
+
+**「开启」写入的是该灯自己的 `max_brightness`，而不是固定的 `1`。** `brightness`
+不是布尔值，而是 `0 … max_brightness` 的区间：普通 GPIO 灯 `max_brightness` 为
+`1`（与写 `1` 完全等价），而 PWM 灯与 RGB 多色灯通常为 `255` —— 对它写 `1` 只有
+1/255 的亮度，肉眼等同熄灭。`max_brightness` 由 LED class 为每个灯注册，内核还会
+在驱动没有设置时强制其为 `LED_FULL`，所以读取它总是安全的。
+
+**「关闭」固定写 `0`。** 内核在写入 0 时会顺带摘除该灯的触发器
+（`led_trigger_remove`），所以被关掉的灯不会被 `timer`、`heartbeat` 之类的触发器
+重新点亮。反过来，写非 0 值不会动触发器，因此「开启」的含义是**让灯恢复它本来的
+行为**，而不是强制常亮 —— 挂着 `netdev` 触发器的网口灯仍会随流量闪烁。也正因为
+关灯会摘掉触发器，关一次再开不会自动恢复它，**重启一次**即可（开机时板级 LED
+配置会重新挂上触发器，之后 `START=99` 再应用您选择的状态）。
 
 关键字匹配用 POSIX 的 `case` 通配符实现，而不是 bash 的 `[[ "$i" =~ "wan" ]]`：
 OpenWrt / ImmortalWrt 的 `/bin/sh` 是 busybox ash，**既不支持 `[[ ]]` 也不支持
