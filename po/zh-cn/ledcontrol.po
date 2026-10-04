@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: luci-app-ledcontrol 1.1.0\n"
+"Project-Id-Version: luci-app-ledcontrol 1.1.2\n"
 "Report-Msgid-Bugs-To: https://github.com/Arthur97172/luci-app-ledcontrol/issues\n"
 "POT-Creation-Date: 2026-10-04 00:00+0000\n"
 "PO-Revision-Date: 2026-10-04 00:00+0000\n"
@@ -38,8 +38,8 @@ msgid "Enable Network Port LEDs"
 msgstr "启用网口指示灯"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:42
-msgid "Controls the LEDs of the network ports, identified by \"wan\", \"lan\" or \"port\" in their name."
-msgstr "控制网口指示灯，即名称中包含 \"wan\"、\"lan\" 或 \"port\" 的 LED。"
+msgid "Controls the network port LEDs, identified by \"wan\", \"lan\", \"port\", \"eth\", \"sw\" or \"gphy\" in their name. Wi-Fi LEDs are status LEDs."
+msgstr "控制网口指示灯，即名称中包含 \"wan\"、\"lan\"、\"port\"、\"eth\"、\"sw\" 或 \"gphy\" 的 LED；Wi-Fi 指示灯属于设备指示灯。"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:84
 msgid "Failed to apply the LED settings: %s"

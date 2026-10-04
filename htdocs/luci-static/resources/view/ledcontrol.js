@@ -39,7 +39,7 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.option(form.Flag, 'net_leds', _('Enable Network Port LEDs'),
-			_('Controls the LEDs of the network ports, identified by "wan", "lan" or "port" in their name.'));
+			_('Controls the network port LEDs, identified by "wan", "lan", "port", "eth", "sw" or "gphy" in their name. Wi-Fi LEDs are status LEDs.'));
 		o.default = '1';
 		o.rmempty = false;
 

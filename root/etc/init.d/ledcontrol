@@ -8,7 +8,7 @@
 # Two independent switches are stored in UCI:
 #
 #   ledcontrol.global.status_leds   the device status LEDs (power, Wi-Fi, USB, ...)
-#   ledcontrol.global.net_leds      the network port LEDs (wan / lan / port)
+#   ledcontrol.global.net_leds      the network port LEDs (wan / lan / port / eth / sw / gphy)
 #
 # START=99 makes this script run as the very last service during boot, i.e.
 # after the kernel LED triggers, the board specific default LED configuration
@@ -22,7 +22,15 @@ USE_PROCD=1
 LED_CLASS_DIR="/sys/class/leds"
 
 # A LED belongs to the network ports when its name carries one of the keywords
-# wan, lan or port.
+# wan, lan, port, eth, sw or gphy.
+#
+# Wi-Fi LEDs are the exception that needs care: they are nearly always named
+# "wlan..." or "wlan0"/"wlan2g", and "wlan" contains "lan", so the plain lan
+# arm would sweep them into the port group. They are status LEDs, so the wlan
+# arm is written first - case takes the first matching pattern, not the best
+# one. "ath9k-phy0" and friends (the Wi-Fi PHY LEDs registered by mac80211) are
+# status LEDs for the same reason, and are why the port keyword is "gphy"
+# rather than the bare "phy": "phy0" must not match.
 #
 # POSIX case patterns are used rather than the bash [[ ... =~ ... ]] operator:
 # /bin/sh on OpenWrt and ImmortalWrt is busybox ash, which implements neither
@@ -30,7 +38,17 @@ LED_CLASS_DIR="/sys/class/leds"
 # so WAN0 / Lan2 / PORT1 are recognised as well as their lower case spellings.
 is_net_led() {
 	case "$1" in
-		*[Ww][Aa][Nn]*|*[Ll][Aa][Nn]*|*[Pp][Oo][Rr][Tt]*) return 0 ;;
+		# Wi-Fi: a status LED, even though its name contains "lan"
+		*[Ww][Ll][Aa][Nn]*) return 1 ;;
+
+		# network port LEDs - one keyword per arm, matched anywhere in the name
+		*[Ww][Aa][Nn]*)     return 0 ;;   # wan, WAN0, green:wan
+		*[Ll][Aa][Nn]*)     return 0 ;;   # lan, lan1, lan-1, green:lan2
+		*[Pp][Oo][Rr][Tt]*) return 0 ;;   # port, usbport, Port2
+		*[Ee][Tt][Hh]*)     return 0 ;;   # eth0, eth1, eth0.2
+		*[Ss][Ww]*)         return 0 ;;   # sw1, switch:green
+		*[Gg][Pp][Hh][Yy]*) return 0 ;;   # gphy0, gphy1
+
 		*) return 1 ;;
 	esac
 }

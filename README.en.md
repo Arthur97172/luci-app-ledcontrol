@@ -39,8 +39,15 @@ What the two toggles do:
 | off | off | everything dark |
 
 A LED counts as a **network port LED** when its name - the directory name below
-`/sys/class/leds/` - contains the keyword `wan`, `lan` or `port`. Every other
-LED (power, Wi-Fi, USB, ...) is a **status LED**.
+`/sys/class/leds/` - contains the keyword `wan`, `lan`, `port`, `eth`, `sw` or
+`gphy`. Every other LED (power, Wi-Fi, USB, ...) is a **status LED**.
+
+Wi-Fi LEDs are the one case that needs care: they are usually named `wlan`,
+`wlan0` or `wlan2g`, and `wlan` contains `lan`, so a plain substring test would
+sweep them into the port group. They are **status LEDs**, so the Wi-Fi test is
+written first and wins. `ath9k-phy0` and the other Wi-Fi PHY LEDs registered by
+mac80211 are status LEDs too - which is why the port keyword is `gphy` and not
+the bare `phy`.
 
 The init script writes each LED the value of the toggle that owns it, which
 covers all four combinations by construction:
