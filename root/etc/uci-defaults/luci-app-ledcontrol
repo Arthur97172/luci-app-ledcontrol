@@ -11,11 +11,24 @@
 
 [ -f /etc/config/ledcontrol ] || touch /etc/config/ledcontrol
 
-if ! uci -q get ledcontrol.global >/dev/null 2>&1; then
-	uci -q set ledcontrol.global=ledcontrol
-	uci -q set ledcontrol.global.enable='1'
-	uci -q commit ledcontrol
+# 1.0.x had a single ledcontrol.global.enable switch. Fold it into the two
+# switches that replaced it, so that upgrading keeps the state the user last
+# chose, then drop the obsolete option. `uci -q get` prints nothing when the
+# option is absent, which leaves a fresh install untouched.
+legacy="$(uci -q get ledcontrol.global.enable)"
+
+if [ -n "$legacy" ]; then
+	uci -q set ledcontrol.global.status_leds="$legacy"
+	uci -q set ledcontrol.global.net_leds="$legacy"
+	uci -q delete ledcontrol.global.enable
 fi
+
+# Both switches default to on, which is what the kernel and the board specific
+# LED configuration set up during boot anyway.
+[ -n "$(uci -q get ledcontrol.global.status_leds)" ] || uci -q set ledcontrol.global.status_leds='1'
+[ -n "$(uci -q get ledcontrol.global.net_leds)" ] || uci -q set ledcontrol.global.net_leds='1'
+
+uci -q commit ledcontrol
 
 chmod 0755 /etc/init.d/ledcontrol 2>/dev/null
 

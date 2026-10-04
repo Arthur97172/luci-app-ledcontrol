@@ -1,9 +1,9 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: luci-app-ledcontrol 1.0.0\n"
+"Project-Id-Version: luci-app-ledcontrol 1.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/Arthur97172/luci-app-ledcontrol/issues\n"
-"POT-Creation-Date: 2026-10-02 00:00+0000\n"
-"PO-Revision-Date: 2026-10-02 00:00+0000\n"
+"POT-Creation-Date: 2026-10-04 00:00+0000\n"
+"PO-Revision-Date: 2026-10-04 00:00+0000\n"
 "Last-Translator: Arthur97172 <Arthur97172@users.noreply.github.com>\n"
 "Language-Team: Chinese (Simplified Han script)\n"
 "Language: zh_Hans\n"
@@ -18,21 +18,29 @@ msgid "LED Control"
 msgstr "LED 指示灯控制"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:30
-msgid "Turn all system LEDs on or off with a single switch."
-msgstr "通过一个开关即可打开或关闭系统上所有的 LED 指示灯。"
+msgid "Turn the device status LEDs and the network port LEDs on or off independently."
+msgstr "可分别打开或关闭设备指示灯与网口指示灯。"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:32
 msgid "Global Settings"
 msgstr "全局设置"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:36
-msgid "Enable LEDs"
-msgstr "启用 LED 指示灯"
+msgid "Enable Status LEDs"
+msgstr "启用设备指示灯"
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:37
-msgid "Controls the status of LEDs. Settings take effect immediately and will persist after a reboot (ON or OFF)."
-msgstr "控制 LED 的状态。设置立即生效，且在路由器重启后依然会自动保持您选择的状态（开启或关闭）。"
+msgid "Controls the device status LEDs, such as the power, Wi-Fi or USB indicators."
+msgstr "控制设备指示灯，例如电源、Wi-Fi、USB 等指示灯。"
 
-#: htdocs/luci-static/resources/view/ledcontrol.js:79
+#: htdocs/luci-static/resources/view/ledcontrol.js:41
+msgid "Enable Network Port LEDs"
+msgstr "启用网口指示灯"
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:42
+msgid "Controls the LEDs of the network ports, identified by \"wan\", \"lan\" or \"port\" in their name."
+msgstr "控制网口指示灯，即名称中包含 \"wan\"、\"lan\" 或 \"port\" 的 LED。"
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:84
 msgid "Failed to apply the LED settings: %s"
 msgstr "应用 LED 设置失败：%s"

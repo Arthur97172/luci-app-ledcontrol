@@ -2,8 +2,9 @@
 
 [简体中文](README.md) | **English**
 
-A small LuCI application for OpenWrt / ImmortalWrt that switches **all** system
-LEDs on or off with a single toggle, and keeps that choice across reboots.
+A small LuCI application for OpenWrt / ImmortalWrt that controls the **device
+status LEDs** and the **network port LEDs** with two independent toggles, and
+keeps the chosen combination across reboots.
 
 * LuCI 2 (client side JavaScript) - no legacy Lua CBI views.
 * English and Simplified Chinese (`zh_Hans`) built in - **no** separate
@@ -17,9 +18,9 @@ The package consists of three cooperating pieces:
 
 | Component | Path | Purpose |
 | --- | --- | --- |
-| UCI config | `/etc/config/ledcontrol` | Stores `ledcontrol.global.enable` (`1` = on, `0` = off). |
+| UCI config | `/etc/config/ledcontrol` | Stores `ledcontrol.global.status_leds` and `ledcontrol.global.net_leds` (`1` = on, `0` = off). |
 | init script | `/etc/init.d/ledcontrol` | `START=99`, applies the stored state at the very end of boot. |
-| LuCI view | `view/ledcontrol.js` | Renders the toggle and applies changes immediately. |
+| LuCI view | `view/ledcontrol.js` | Renders the two toggles and applies changes immediately. |
 
 When you press **Save & Apply**, the browser commits the UCI change and then
 calls `ubus call rc init {"name":"ledcontrol","action":"restart"}`, so the LEDs
@@ -28,13 +29,45 @@ on every boot at `START=99` (after the kernel LED triggers and the board
 default LED configuration have been set up), the chosen state survives a
 reboot.
 
-The LED loop is exactly the one from the specification:
+What the two toggles do:
+
+| Status LEDs | Port LEDs | Result |
+| --- | --- | --- |
+| on | on | everything lit |
+| on | off | only the status LEDs lit |
+| off | on | only the port LEDs lit |
+| off | off | everything dark |
+
+A LED counts as a **network port LED** when its name - the directory name below
+`/sys/class/leds/` - contains the keyword `wan`, `lan` or `port`. Every other
+LED (power, Wi-Fi, USB, ...) is a **status LED**.
+
+The init script writes each LED the value of the toggle that owns it, which
+covers all four combinations by construction:
 
 ```sh
-for i in /sys/class/leds/*; do [ -e "$i/brightness" ] && echo 0 > "$i/brightness"; done
+for led in /sys/class/leds/*; do
+	[ -e "$led/brightness" ] || continue
+	if is_net_led "${led##*/}"; then
+		echo "$net_value" > "$led/brightness"
+	else
+		echo "$status_value" > "$led/brightness"
+	fi
+done
 ```
 
-with `1` written instead of `0` when LEDs are enabled.
+The keyword test uses POSIX `case` patterns rather than the bash
+`[[ "$i" =~ "wan" ]]` operator: `/bin/sh` on OpenWrt and ImmortalWrt is busybox
+ash, which supports **neither `[[ ]]` nor `=~`**. Written in bash syntax the
+init script would fail with a syntax error on every boot and apply nothing.
+
+### Upgrading from 1.0.x
+
+1.0.x had a single `ledcontrol.global.enable` toggle. On upgrade,
+`/etc/uci-defaults/luci-app-ledcontrol` copies its value into both new toggles
+and removes the obsolete option, so the state you last chose survives. The init
+script also treats the old option as a fallback for both new toggles while it is
+still present - after restoring a 1.0.x configuration backup, for instance.
 
 ## Installation
 
@@ -65,7 +98,9 @@ Then open **System → LED Control** in LuCI.
 ## Command line
 
 ```sh
-uci set ledcontrol.global.enable='0'
+# status LEDs off, network port LEDs kept on
+uci set ledcontrol.global.status_leds='0'
+uci set ledcontrol.global.net_leds='1'
 uci commit ledcontrol
 /etc/init.d/ledcontrol restart
 ```

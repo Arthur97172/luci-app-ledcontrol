@@ -8,14 +8,14 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-ledcontrol
-PKG_VERSION:=1.0.0
+PKG_VERSION:=1.1.0
 PKG_RELEASE:=1
 
 PKG_LICENSE:=GPL-3.0-only
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Arthur97172 <Arthur97172@users.noreply.github.com>
 
-LUCI_TITLE:=LuCI app to switch all system LEDs on or off
+LUCI_TITLE:=LuCI app to switch the status LEDs and the network port LEDs on or off
 LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 LUCI_URL:=https://github.com/Arthur97172/luci-app-ledcontrol

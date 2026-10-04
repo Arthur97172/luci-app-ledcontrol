@@ -27,14 +27,19 @@ return view.extend({
 		var m, s, o;
 
 		m = new form.Map('ledcontrol', _('LED Control'),
-			_('Turn all system LEDs on or off with a single switch.'));
+			_('Turn the device status LEDs and the network port LEDs on or off independently.'));
 
 		s = m.section(form.NamedSection, 'global', 'ledcontrol', _('Global Settings'));
 		s.anonymous = true;
 		s.addremove = false;
 
-		o = s.option(form.Flag, 'enable', _('Enable LEDs'),
-			_('Controls the status of LEDs. Settings take effect immediately and will persist after a reboot (ON or OFF).'));
+		o = s.option(form.Flag, 'status_leds', _('Enable Status LEDs'),
+			_('Controls the device status LEDs, such as the power, Wi-Fi or USB indicators.'));
+		o.default = '1';
+		o.rmempty = false;
+
+		o = s.option(form.Flag, 'net_leds', _('Enable Network Port LEDs'),
+			_('Controls the LEDs of the network ports, identified by "wan", "lan" or "port" in their name.'));
 		o.default = '1';
 		o.rmempty = false;
 
@@ -45,12 +50,12 @@ return view.extend({
 		return this.handleSave(ev).then(function() {
 			/*
 			 * Commit the staged UCI change first, so that the init script
-			 * restarted below already reads the new "enable" value.
+			 * restarted below already reads the new switch values.
 			 *
 			 * uci.apply() is the raw ubus RPC rather than the HTTP endpoint
 			 * the stock footer posts to, and it answers UBUS_STATUS_NO_DATA
 			 * when there is nothing staged to commit - which is exactly the
-			 * case when Save & Apply is pressed without touching the switch.
+			 * case when Save & Apply is pressed without touching a switch.
 			 * The call is declared reject: true, so that status arrives as a
 			 * rejected promise and would be reported below as a bogus failure
 			 * of an operation that was really a no-op. Ask uci.changes() for

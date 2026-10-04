@@ -2,8 +2,8 @@
 
 **简体中文** | [English](README.en.md)
 
-一个用于 OpenWrt / ImmortalWrt 的小型 LuCI 应用，通过一个开关即可打开或关闭
-**所有**系统 LED 指示灯，并且该设置会在重启后自动恢复。
+一个用于 OpenWrt / ImmortalWrt 的小型 LuCI 应用，通过两个独立开关分别控制
+**设备指示灯**与**网口指示灯**，并且所选的组合会在重启后自动恢复。
 
 * 基于 LuCI 2（客户端 JavaScript），不含传统的 Lua CBI 视图。
 * 内置英文与简体中文（`zh_Hans`）界面，**无需**再单独安装 `luci-i18n-*`
@@ -17,9 +17,9 @@
 
 | 组件 | 路径 | 作用 |
 | --- | --- | --- |
-| UCI 配置 | `/etc/config/ledcontrol` | 保存 `ledcontrol.global.enable`（`1` = 开启，`0` = 关闭）。 |
+| UCI 配置 | `/etc/config/ledcontrol` | 保存 `ledcontrol.global.status_leds` 与 `ledcontrol.global.net_leds`（`1` = 开启，`0` = 关闭）。 |
 | init 脚本 | `/etc/init.d/ledcontrol` | `START=99`，在启动过程的最后阶段应用已保存的状态。 |
-| LuCI 视图 | `view/ledcontrol.js` | 渲染开关，并让改动立即生效。 |
+| LuCI 视图 | `view/ledcontrol.js` | 渲染两个开关，并让改动立即生效。 |
 
 当您点击 **保存并应用** 时，浏览器会先提交 UCI 改动，然后调用
 `ubus call rc init {"name":"ledcontrol","action":"restart"}`，因此 LED 会立刻改变
@@ -27,13 +27,42 @@
 （此时内核 LED 触发器与主板默认 LED 配置均已初始化完毕），所以所选的设置能够
 在重启后保持。
 
-LED 循环与规格说明中完全一致：
+两个开关的组合效果：
+
+| 设备指示灯 | 网口指示灯 | 结果 |
+| --- | --- | --- |
+| 开 | 开 | 全部点亮 |
+| 开 | 关 | 仅设备指示灯亮，网口灯熄灭 |
+| 关 | 开 | 仅网口灯亮，设备指示灯熄灭 |
+| 关 | 关 | 全部熄灭 |
+
+判定规则：`/sys/class/leds/` 下的目录名（即 LED 名字）中包含 `wan`、`lan`
+或 `port` 关键字的，属于**网口指示灯**，由「启用网口指示灯」控制；其余
+（电源、Wi-Fi、USB 等）由「启用设备指示灯」控制。
+
+init 脚本对每个 LED 写入它所属开关的值，四种组合由此自然覆盖：
 
 ```sh
-for i in /sys/class/leds/*; do [ -e "$i/brightness" ] && echo 0 > "$i/brightness"; done
+for led in /sys/class/leds/*; do
+	[ -e "$led/brightness" ] || continue
+	if is_net_led "${led##*/}"; then
+		echo "$net_value" > "$led/brightness"
+	else
+		echo "$status_value" > "$led/brightness"
+	fi
+done
 ```
 
-当 LED 处于启用状态时，写入的值为 `1` 而不是 `0`。
+关键字匹配用 POSIX 的 `case` 通配符实现，而不是 bash 的 `[[ "$i" =~ "wan" ]]`：
+OpenWrt / ImmortalWrt 的 `/bin/sh` 是 busybox ash，**既不支持 `[[ ]]` 也不支持
+`=~`**，写成 bash 语法会让 init 脚本每次启动都报语法错误、状态完全无法应用。
+
+### 从 1.0.x 升级
+
+1.0.x 只有一个 `ledcontrol.global.enable` 开关。升级时
+`/etc/uci-defaults/luci-app-ledcontrol` 会把它的值同时写入两个新开关并删除旧
+选项，因此升级后仍然是您上次选择的状态；init 脚本也会在旧选项仍然存在时把
+它当作两个新开关的回退值（例如从 1.0.x 备份恢复配置之后）。
 
 ## 安装
 
@@ -62,7 +91,9 @@ apk add --allow-untrusted luci-app-ledcontrol-*.apk
 ## 命令行
 
 ```sh
-uci set ledcontrol.global.enable='0'
+# 关闭设备指示灯，保留网口灯
+uci set ledcontrol.global.status_leds='0'
+uci set ledcontrol.global.net_leds='1'
 uci commit ledcontrol
 /etc/init.d/ledcontrol restart
 ```

@@ -6,7 +6,7 @@ msgid "LED Control"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:30
-msgid "Turn all system LEDs on or off with a single switch."
+msgid "Turn the device status LEDs and the network port LEDs on or off independently."
 msgstr ""
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:32
@@ -14,13 +14,21 @@ msgid "Global Settings"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:36
-msgid "Enable LEDs"
+msgid "Enable Status LEDs"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/ledcontrol.js:37
-msgid "Controls the status of LEDs. Settings take effect immediately and will persist after a reboot (ON or OFF)."
+msgid "Controls the device status LEDs, such as the power, Wi-Fi or USB indicators."
 msgstr ""
 
-#: htdocs/luci-static/resources/view/ledcontrol.js:79
+#: htdocs/luci-static/resources/view/ledcontrol.js:41
+msgid "Enable Network Port LEDs"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:42
+msgid "Controls the LEDs of the network ports, identified by \"wan\", \"lan\" or \"port\" in their name."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/ledcontrol.js:84
 msgid "Failed to apply the LED settings: %s"
 msgstr ""

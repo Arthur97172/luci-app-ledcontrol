@@ -5,6 +5,11 @@
 #
 # ledcontrol - force the state of every LED exposed through /sys/class/leds.
 #
+# Two independent switches are stored in UCI:
+#
+#   ledcontrol.global.status_leds   the device status LEDs (power, Wi-Fi, USB, ...)
+#   ledcontrol.global.net_leds      the network port LEDs (wan / lan / port)
+#
 # START=99 makes this script run as the very last service during boot, i.e.
 # after the kernel LED triggers, the board specific default LED configuration
 # and every hardware driver have been initialised. Running any earlier would
@@ -16,36 +21,79 @@ USE_PROCD=1
 
 LED_CLASS_DIR="/sys/class/leds"
 
+# A LED belongs to the network ports when its name carries one of the keywords
+# wan, lan or port.
+#
+# POSIX case patterns are used rather than the bash [[ ... =~ ... ]] operator:
+# /bin/sh on OpenWrt and ImmortalWrt is busybox ash, which implements neither
+# [[ ]] nor =~. The bracket expressions below make the match case insensitive,
+# so WAN0 / Lan2 / PORT1 are recognised as well as their lower case spellings.
+is_net_led() {
+	case "$1" in
+		*[Ww][Aa][Nn]*|*[Ll][Aa][Nn]*|*[Pp][Oo][Rr][Tt]*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+# led_apply <status_value> <net_value>
+#
+# Each LED is written the value of the switch that owns it, which covers the
+# four combinations exactly:
+#
+#   status_leds net_leds | status LEDs | port LEDs | result
+#   ---------------------+-------------+-----------+-----------------------
+#        0           0    |      0      |     0     | everything off
+#        0           1    |      0      |     1     | only ports stay on
+#        1           0    |      1      |     0     | only ports go dark
+#        1           1    |      1      |     1     | everything on
 led_apply() {
-	local value="$1"
+	local status_value="$1"
+	local net_value="$2"
 	local led
 
 	for led in "$LED_CLASS_DIR"/*; do
 		[ -e "$led/brightness" ] || continue
-		echo "$value" > "$led/brightness" 2>/dev/null
+
+		if is_net_led "${led##*/}"; then
+			echo "$net_value" > "$led/brightness" 2>/dev/null
+		else
+			echo "$status_value" > "$led/brightness" 2>/dev/null
+		fi
 	done
 }
 
-start_service() {
-	local enable
-
-	config_load ledcontrol
-	config_get enable global enable '1'
-
-	case "$enable" in
-		0)
-			logger -t ledcontrol "turning all system LEDs off"
-			led_apply 0
-			;;
-		*)
-			logger -t ledcontrol "turning all system LEDs on"
-			led_apply 1
-			;;
+# Anything other than a literal 0 counts as "on" - the same rule the 1.0.x
+# script used for its single "enable" switch.
+led_normalise() {
+	case "$1" in
+		0) echo 0 ;;
+		*) echo 1 ;;
 	esac
 }
 
+start_service() {
+	local legacy status_leds net_leds
+
+	config_load ledcontrol
+
+	# 1.0.x stored a single "enable" switch. Use its value for both new
+	# switches when they are absent, so a system that was upgraded - or whose
+	# /etc/config/ledcontrol was restored from a 1.0.x backup - keeps the
+	# state the user last chose instead of silently turning everything on.
+	config_get legacy global enable ''
+
+	config_get status_leds global status_leds "${legacy:-1}"
+	config_get net_leds global net_leds "${legacy:-1}"
+
+	status_leds="$(led_normalise "$status_leds")"
+	net_leds="$(led_normalise "$net_leds")"
+
+	logger -t ledcontrol "applying LED state: status=$status_leds net=$net_leds"
+	led_apply "$status_leds" "$net_leds"
+}
+
 stop_service() {
-	led_apply 1
+	led_apply 1 1
 }
 
 reload_service() {

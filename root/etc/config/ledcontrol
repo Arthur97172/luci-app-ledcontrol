@@ -1,2 +1,3 @@
 config ledcontrol 'global'
-	option enable '1'
+	option status_leds '1'
+	option net_leds '1'
