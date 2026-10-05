@@ -22,55 +22,49 @@ LUCI_URL:=https://github.com/Arthur97172/luci-app-ledcontrol
 LUCI_MAINTAINER:=Arthur97172 <Arthur97172@users.noreply.github.com>
 
 # ---------------------------------------------------------------------------
-# Simplified Chinese ships inside the main package, not as a separate
-# luci-i18n-ledcontrol-zh-cn package, so one install gives both languages.
+# Simplified Chinese ships as its own luci-i18n-ledcontrol-zh-cn package.
 #
-# luci.mk derives its translation packages from the directory names below ./po
-# (luci.mk:10) and only defines one for a language that also appears in its
-# built-in LUCI_LANG.* table (luci.mk:354). "zh_Hans" is in that table, so a
-# po/zh_Hans directory would make luci.mk emit luci-i18n-ledcontrol-zh-cn. The
-# directory is therefore named "zh-cn" - the tag LuCI itself uses for the
-# compiled catalog, see LUCI_LC_ALIAS.zh_Hans=zh-cn - which leaves
-# LUCI_LANGUAGES non-empty but unmatched, so no translation package is defined.
+# luci.mk builds one translation package per directory under ./po, but only for
+# directory names that also appear in its built-in LUCI_LANG.* table: luci.mk:10
+# collects the directory names into LUCI_LANGUAGES and luci.mk:354 emits a
+# LuciTranslation package for each one it recognises. The directory is therefore
+# po/zh_Hans - the spelling in that table - and luci.mk turns it into
+# luci-i18n-ledcontrol-zh-cn, whose install rule compiles po/zh_Hans/*.po with
+# po2lmo into usr/lib/lua/luci/i18n/ and ships a uci-defaults that registers
+# 简体中文 in luci.languages (luci.mk:340-348).
+#
+# The catalog is named ledcontrol.zh-cn.lmo rather than ledcontrol.zh_Hans.lmo
+# because LUCI_LC_ALIAS.zh_Hans=zh-cn (luci.mk:75) supplies the tag LuCI itself
+# uses for the compiled catalog. That name is load bearing: the ucode dispatcher
+# loads every *.zh-cn.lmo in that directory (lmo.c:237), so it must not change.
 #
 # English needs no file at all: LuCI's _() returns the msgid unchanged when no
 # translation matches, so the English strings in ledcontrol.js are their own
 # translation.
-#
-# Compiling the catalog into $(PKG_BUILD_DIR)/root/ is what gets it into the
-# package: luci.mk's generated Package/$(PKG_NAME)/install copies
-# $(PKG_BUILD_DIR)/root/* into the package verbatim (luci.mk:221-224), so the
-# .lmo is picked up along with everything else under root/.
-#
-# This block has to sit *before* the include, and has to say `override`. luci.mk
-# unconditionally replaces Build/Compile with an empty one for packages without
-# a src/Makefile (luci.mk:196-199), and it calls BuildPackage itself at its own
-# line 355. BuildPackage expands Build/Compile while it runs
-# (include/package.mk:296 -> 245), so the recipe is fixed at that moment: a
-# definition written after the include is never looked at, and a plain one
-# written before it gets overwritten. `override` is the only spelling that both
-# precedes the include and survives it. Re-calling BuildPackage afterwards does
-# not help either, because Build/DefaultTargets clears itself after its first
-# use (package.mk:298).
 # ---------------------------------------------------------------------------
-override define Build/Compile
-	$(INSTALL_DIR) $(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n
-	po2lmo ${CURDIR}/po/zh-cn/ledcontrol.po \
-		$(PKG_BUILD_DIR)/root/usr/lib/lua/luci/i18n/ledcontrol.zh-cn.lmo
-endef
+
+# The translation package would otherwise take its version from luci.mk's
+# findrev helper (luci.mk:118), which derives it from the newest commit touching
+# po/ - and falls back to plain file mtimes when there is no git history, as in
+# a CI checkout, yielding something like "0.261004.44260". Pinning it to the
+# release version keeps every package in a release telling the same story.
+# luci.mk assigns PKG_PO_VERSION with ?=, so this definition is respected, and
+# it also skips findrev during the package scan.
+PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
 #
 # The line above is load bearing and must not be removed: OpenWrt's package
-# scanner (include/scan.mk) discovers package directories by grepping their
-# Makefile for the literal text "call BuildPackage". Without it the package is
-# silently skipped and "make package/luci-app-ledcontrol/compile" fails with
-# "No rule to make target".
+# scanner discovers package directories by grepping their Makefile for the
+# literal text "call BuildPackage" - see GREP_STRING in include/scan.mk:72 and
+# the find|xargs grep in include/scan.mk:77. Without it the package is silently
+# skipped and "make package/luci-app-ledcontrol/compile" fails with "No rule to
+# make target".
 #
 # Note that the macro itself is *not* invoked here: luci.mk already calls
-# BuildPackage for every entry in LUCI_BUILD_PACKAGES, which for this package
-# is just $(PKG_NAME) - see the note above on why no luci-i18n-* package is
-# generated. The literal text above exists purely so that include/scan.mk can
-# find the package directory.
+# BuildPackage for every entry in LUCI_BUILD_PACKAGES (luci.mk:355), which for
+# this package is luci-app-ledcontrol together with luci-i18n-ledcontrol-zh-cn.
+# The literal text above exists purely so that include/scan.mk can find the
+# package directory.
