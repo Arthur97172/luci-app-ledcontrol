@@ -104,9 +104,8 @@ make package/luci-app-ledcontrol/compile V=s
 （`.ipk`）与 **25.12.5**（`.apk`）的官方 SDK 构建本软件包，并把编译出的安装包
 作为构建产物上传。每次 push、pull request 以及手动触发时都会运行。
 
-编译前先跑一个 `test` job：`node tests/i18n.test.js` 加语法检查（`node --check`、
-`sh -n`）。它只有几秒钟，但能拦住「文案改了、po 没跟着改」这类只会让界面静默
-退回英文的问题。`build` 依赖它，测试不过就不编译。
+编译前先做一次语法检查（`node --check`、`sh -n`），只需几秒就能拦住视图或 init
+脚本里的语法错误，不必在 SDK 里白等几分钟。
 
 推送时还会把软件包发布到 Releases 页面，tag 与名称都直接读取 Makefile 里的
 `PKG_VERSION`/`PKG_RELEASE`，因此版本号只有一个来源，软件包与 tag 不会出现
@@ -122,7 +121,6 @@ luci-app-ledcontrol/
 ├── po/
 │   ├── templates/ledcontrol.pot
 │   └── zh_Hans/ledcontrol.po
-├── tests/i18n.test.js
 ├── root/
 │   ├── etc/
 │   │   ├── config/ledcontrol

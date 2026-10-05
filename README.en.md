@@ -109,11 +109,9 @@ OpenWrt **24.10.8** (`.ipk`) and **25.12.5** (`.apk`) in a matrix and uploads
 the built packages as artifacts. It runs on every push, pull request and manual
 dispatch.
 
-Before compiling it runs a `test` job: `node tests/i18n.test.js` plus syntax
-checks (`node --check`, `sh -n`). It takes seconds, but it catches the kind of
-change that would otherwise only show up as a page that is silently still in
-English - a string edited in the view without the matching `po` entry. `build`
-depends on it, so a failing test stops the build.
+Before compiling it runs syntax checks (`node --check`, `sh -n`). They take
+seconds and catch a broken view or init script, rather than letting it surface
+minutes later inside the SDK.
 
 On a push it also publishes the packages to the Releases page, taking both the
 tag and the release name from `PKG_VERSION`/`PKG_RELEASE` in the Makefile. The
@@ -130,7 +128,6 @@ luci-app-ledcontrol/
 ├── po/
 │   ├── templates/ledcontrol.pot
 │   └── zh_Hans/ledcontrol.po
-├── tests/i18n.test.js
 ├── root/
 │   ├── etc/
 │   │   ├── config/ledcontrol

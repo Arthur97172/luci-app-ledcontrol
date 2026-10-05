@@ -25,36 +25,11 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Cheap guards first. They finish in seconds and catch the failure modes that
-  # would otherwise surface only as a page that is silently still in English.
-  # ---------------------------------------------------------------------------
-  test:
-    name: i18n and syntax checks
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      # Asserts that every _() literal in the view has a msgid in the po, that
-      # the po carries no orphans, and that po/ is named so that luci.mk emits
-      # luci-i18n-ledcontrol-zh-cn at all. Plain node, no dependencies.
-      - name: i18n regression test
-        run: node tests/i18n.test.js
-
-      - name: Syntax checks
-        run: |
-          node --check htdocs/luci-static/resources/view/ledcontrol.js
-          sh -n root/etc/init.d/ledcontrol
-          sh -n root/etc/uci-defaults/luci-app-ledcontrol
-
-  # ---------------------------------------------------------------------------
   # Compile in parallel: one runner for the opkg (.ipk) SDK, one for the
   # apk (.apk) SDK.
   # ---------------------------------------------------------------------------
   build:
     name: ${{ matrix.artifact }}
-    needs: test
     runs-on: ubuntu-22.04
 
     strategy:
@@ -75,6 +50,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: package-dir
+
+      # Cheap syntax guards. They need no extra files - just the sources that
+      # ship in the package - and they catch a broken view or init script
+      # before spending minutes inside the SDK.
+      - name: Syntax checks
+        run: |
+          node --check package-dir/htdocs/luci-static/resources/view/ledcontrol.js
+          sh -n package-dir/root/etc/init.d/ledcontrol
+          sh -n package-dir/root/etc/uci-defaults/luci-app-ledcontrol
 
       # LUCI_PKGARCH:=all and no compiled code means a single target's SDK
       # yields a package that installs on ARM, x86 and MIPS alike, so one

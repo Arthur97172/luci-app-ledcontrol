@@ -1,0 +1,6 @@
+# Local-only working files. The design notes under docs/ and the i18n
+# regression test under tests/ live in the working tree but are deliberately
+# not part of the published repository, so they are ignored rather than
+# tracked. Run the test with: node tests/i18n.test.js
+docs/
+tests/
