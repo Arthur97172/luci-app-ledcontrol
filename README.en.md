@@ -40,40 +40,6 @@ What the two toggles do:
 **network port LED**; every other one (power, Wi-Fi, USB, ...) is a **status
 LED**. Wi-Fi LEDs (names containing `wlan`) count as status LEDs.
 
-Each LED is written the value of the toggle that owns it: "on" writes the LED's
-own `max_brightness`, "off" writes `0`. See
-[Implementation notes](#implementation-notes) for why.
-
-### Upgrading from 1.0.x
-
-1.0.x had a single `ledcontrol.global.enable` toggle. On upgrade,
-`/etc/uci-defaults/luci-app-ledcontrol` copies its value into both new toggles
-and removes the obsolete option, so the state you last chose survives. The init
-script also treats the old option as a fallback for both new toggles while it is
-still present - after restoring a 1.0.x configuration backup, for instance.
-
-## Implementation notes
-
-- **"On" writes the LED's own `max_brightness`, not a hard coded `1`.**
-  `brightness` is a range of `0 … max_brightness`: a plain GPIO LED has `1`
-  (exactly equivalent to writing `1`), while a PWM or RGB LED typically has
-  `255`, where writing `1` is 1/255 of the range - visually off.
-- **"Off" is always a literal `0`.** Writing 0 is what makes the kernel detach
-  the LED's trigger, so a LED that was switched off is not lit up again by a
-  `timer`, `heartbeat` or similar trigger. Writing a non-zero value leaves the
-  trigger alone, so "on" means **let the LED resume its normal behaviour**
-  rather than force it steady. Because switching off detaches the trigger, an
-  off/on cycle does not bring it back; **a reboot does**.
-- **The Wi-Fi test comes before the keyword test and wins.** `wlan` contains
-  `lan`, so otherwise Wi-Fi LEDs would be swept into the port group. The same
-  goes for the Wi-Fi PHY LEDs such as `ath9k-phy0` - which is why the port
-  keyword is `gphy` and not the bare `phy`.
-- **The keyword test uses POSIX `case` patterns**, not the bash
-  `[[ "$i" =~ "wan" ]]` operator: `/bin/sh` on OpenWrt and ImmortalWrt is
-  busybox ash, which supports **neither `[[ ]]` nor `=~`**. Written in bash
-  syntax the init script would fail with a syntax error on every boot and apply
-  nothing.
-
 ## Installation
 
 Download the matching package from the [Releases](../../releases) page, copy it
@@ -84,22 +50,17 @@ tag and name are read straight from `PKG_VERSION`/`PKG_RELEASE` in the Makefile
 (`1.0.2-r1`, say), so the version you download always matches the tag.
 
 The main package carries the English interface only:
-
-```sh
-# OpenWrt 24.10 and older (opkg)
-opkg install luci-app-ledcontrol_*.ipk
-
-# OpenWrt 25.12 and newer (apk)
-apk add --allow-untrusted luci-app-ledcontrol-*.apk
-```
-
 For Simplified Chinese, install the language package from the same release:
 
 ```sh
 # OpenWrt 24.10 and older (opkg)
+opkg install luci-app-ledcontrol_*.ipk
+# Chinese UI needs the translation package as well
 opkg install luci-i18n-ledcontrol-zh-cn_*.ipk
 
 # OpenWrt 25.12 and newer (apk)
+apk add --allow-untrusted luci-app-ledcontrol-*.apk
+# Chinese UI needs the translation package as well
 apk add --allow-untrusted luci-i18n-ledcontrol-zh-cn-*.apk
 ```
 
@@ -180,33 +141,6 @@ luci-app-ledcontrol/
 │       └── rpcd/acl.d/luci-app-ledcontrol.json
 └── .github/workflows/build.yml
 ```
-
-The `menu.d` and `acl.d` files are what actually make the page reachable: the
-first registers the *System → LED Control* entry, the second grants the view
-read/write access to the `ledcontrol` UCI config and permission to call
-`rc init`.
-
-The `zh_Hans` directory name under `po/` is what decides which language package
-luci.mk emits: it generates a `luci-i18n-*` package per directory below `po/`,
-but only for names that appear in its built-in language table (`LUCI_LANG.*` in
-`luci.mk`). `zh_Hans` is in that table, so the directory yields
-`luci-i18n-ledcontrol-zh-cn`.
-
-The compiled catalog is named `ledcontrol.zh-cn.lmo` rather than
-`ledcontrol.zh_Hans.lmo`, because the table's `LUCI_LC_ALIAS.zh_Hans=zh-cn`
-supplies the tag LuCI uses for the compiled catalog. That name is load bearing:
-the ucode dispatcher loads every `*.zh-cn.lmo` in `/usr/lib/lua/luci/i18n/`.
-
-English needs no file at all: when no translation matches, `_()` returns the
-msgid unchanged, so the English strings in `ledcontrol.js` are their own
-translation.
-
-`tests/i18n.test.js` is the regression test for this chain
-(`node tests/i18n.test.js`). It asserts that every `_()` literal in the view has
-a msgid in the `po`, that the `po` has no orphans, that no msgid carries
-surrounding whitespace and that none contains an escape `po2lmo` does not
-handle. Each of those failures makes the interface fall back to English
-**silently**, which is why the assertions are worth keeping in CI.
 
 ## License
 

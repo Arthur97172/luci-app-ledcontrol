@@ -37,32 +37,6 @@
 `port`、`eth`、`sw` 或 `gphy` 的属于**网口指示灯**；其余（电源、Wi-Fi、USB 等）
 属于**设备指示灯**。Wi-Fi 灯（名字含 `wlan`）算设备指示灯。
 
-脚本对每个 LED 写入它所属开关的值：「开」写该灯的 `max_brightness`，「关」写 `0`。
-为什么这样写，见下面的[实现说明](#实现说明)。
-
-### 从 1.0.x 升级
-
-1.0.x 只有一个 `ledcontrol.global.enable` 开关。升级时
-`/etc/uci-defaults/luci-app-ledcontrol` 会把它的值同时写入两个新开关并删除旧
-选项，因此升级后仍然是您上次选择的状态；init 脚本也会在旧选项仍然存在时把
-它当作两个新开关的回退值（例如从 1.0.x 备份恢复配置之后）。
-
-## 实现说明
-
-- **「开」写的是该灯自己的 `max_brightness`，不是固定的 `1`。** `brightness` 是
-  `0 … max_brightness` 的区间：普通 GPIO 灯为 `1`（与写 `1` 完全等价），PWM 灯与
-  RGB 多色灯通常为 `255`，对它写 `1` 只有 1/255 的亮度、肉眼等同熄灭。
-- **「关」固定写 `0`。** 内核在写入 0 时会顺带摘除该灯的触发器，所以关掉的灯不会
-  被 `timer`、`heartbeat` 之类的触发器重新点亮；写非 0 值则不动触发器，因此「开」
-  的含义是**让灯恢复它本来的行为**，而不是强制常亮。也正因为关灯会摘掉触发器，
-  关一次再开不会自动恢复它，**重启一次**即可。
-- **Wi-Fi 灯的判定排在关键字之前并优先命中。** `wlan` 里含有 `lan`，不这样处理会
-  被卷进网口组；`ath9k-phy0` 这类 Wi-Fi PHY 灯同理 —— 这也是网口关键字用 `gphy`
-  而不是单独的 `phy` 的原因。
-- **关键字用 POSIX `case` 通配符匹配**，而不是 bash 的 `[[ "$i" =~ "wan" ]]`：
-  OpenWrt / ImmortalWrt 的 `/bin/sh` 是 busybox ash，**既不支持 `[[ ]]` 也不支持
-  `=~`**，写成 bash 语法会让 init 脚本每次启动都报语法错误、状态完全无法应用。
-
 ## 安装
 
 从 [Releases](../../releases) 页面下载对应的软件包，复制到路由器上并安装。
@@ -73,28 +47,24 @@
 
 主程序包只带英文界面。需要简体中文时，从同一个 Release 里再装语言包：
 
-```sh
-# OpenWrt 24.10 及更早（opkg）
-opkg install luci-i18n-ledcontrol-zh-cn_*.ipk
-
-# OpenWrt 25.12 及更新（apk）
-apk add --allow-untrusted luci-i18n-ledcontrol-zh-cn-*.apk
-```
-
-装好后，LuCI 的 **系统 → 语言和界面** 里会出现「简体中文」；语言设置保持默认的
-`auto` 时，浏览器语言为中文会自动选中它。
-
 OpenWrt 24.10 及更早版本（opkg）：
 
 ```sh
 opkg install luci-app-ledcontrol_*.ipk
+# 中文界面需额外安装翻译包
+opkg install luci-i18n-ledcontrol-zh-cn_*.ipk
 ```
 
 OpenWrt 25.12 及更新版本（apk）：
 
 ```sh
 apk add --allow-untrusted luci-app-ledcontrol-*.apk
+# 中文界面需额外安装翻译包
+apk add --allow-untrusted luci-i18n-ledcontrol-zh-cn-*.apk
 ```
+
+装好后，LuCI 的 **系统 → 语言和界面** 里会出现「简体中文」；语言设置保持默认的
+`auto` 时，浏览器语言为中文会自动选中它。
 
 然后打开 LuCI 中的 **系统 → LED 指示灯控制**。
 
@@ -163,25 +133,6 @@ luci-app-ledcontrol/
 │       └── rpcd/acl.d/luci-app-ledcontrol.json
 └── .github/workflows/build.yml
 ```
-
-真正让页面可以被访问到的是 `menu.d` 与 `acl.d` 这两个文件：前者注册了
-*系统 → LED 指示灯控制* 菜单项，后者授予该视图读写 `ledcontrol` UCI 配置以及调用
-`rc init` 的权限。
-
-`po/` 下的目录名 `zh_Hans` 决定 luci.mk 生成哪个语言包：它按目录名生成
-`luci-i18n-*` 包，但只对出现在内置语言表（`luci.mk` 的 `LUCI_LANG.*`）里的名字生效。
-`zh_Hans` 在表里，于是产出 `luci-i18n-ledcontrol-zh-cn`。
-
-编译产物的文件名却是 `ledcontrol.zh-cn.lmo` 而不是 `ledcontrol.zh_Hans.lmo`：表里的
-`LUCI_LC_ALIAS.zh_Hans=zh-cn` 给出的是 LuCI 给编译产物用的语言标签。这个名字不能改
-—— ucode 调度器就是按 `*.zh-cn.lmo` 通配去 `/usr/lib/lua/luci/i18n/` 里加载的。
-
-英文不需要任何文件：没有命中译文时 `_()` 原样返回 msgid，所以 `ledcontrol.js` 里的
-英文本身就是它的译文。
-
-`tests/i18n.test.js` 是这条链路的回归测试（`node tests/i18n.test.js`）：它断言 view 里
-每个 `_()` 字面量都能在 po 里命中、po 里没有孤儿条目、msgid 无首尾空白也不含 po2lmo
-不处理的转义。任何一条对不上都会让界面**静默**退回英文，所以这些断言值得留在 CI 里。
 
 ## 许可证
 
