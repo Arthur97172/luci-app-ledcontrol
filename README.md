@@ -11,32 +11,6 @@
 * 同时支持两种软件包格式：`.ipk`（opkg，OpenWrt 24.10）与 `.apk`
   （apk-openssl，OpenWrt 25.12+）。
 
-## 工作原理
-
-本软件包由三个部分组成：
-
-| 组件 | 路径 | 作用 |
-| --- | --- | --- |
-| UCI 配置 | `/etc/config/ledcontrol` | 保存两个开关的状态（`1` = 开，`0` = 关）。 |
-| init 脚本 | `/etc/init.d/ledcontrol` | 开机时（`START=99`）把保存的状态写入各个 LED。 |
-| LuCI 视图 | `view/ledcontrol.js` | 提供两个开关，改动立即生效。 |
-
-点击 **保存并应用** 后，浏览器先提交 UCI 改动，再重启 init 脚本，因此 LED 立刻
-改变状态、无需重启；init 脚本每次开机都会再执行一遍，所以设置在重启后依然保持。
-
-两个开关的组合效果：
-
-| 设备指示灯 | 网口指示灯 | 结果 |
-| --- | --- | --- |
-| 开 | 开 | 全部点亮 |
-| 开 | 关 | 仅设备指示灯亮 |
-| 关 | 开 | 仅网口灯亮 |
-| 关 | 关 | 全部熄灭 |
-
-**判定规则**：LED 名字（`/sys/class/leds/` 下的目录名）中包含 `wan`、`lan`、
-`port`、`eth`、`sw` 或 `gphy` 的属于**网口指示灯**；其余（电源、Wi-Fi、USB 等）
-属于**设备指示灯**。Wi-Fi 灯（名字含 `wlan`）算设备指示灯。
-
 ## 安装
 
 从 [Releases](../../releases) 页面下载对应的软件包，复制到路由器上并安装。
@@ -68,17 +42,18 @@ apk add --allow-untrusted luci-i18n-ledcontrol-zh-cn-*.apk
 
 然后打开 LuCI 中的 **系统 → LED 指示灯控制**。
 
-## 命令行
+## 从源码编译
+
+在 OpenWrt / ImmortalWrt 源码树中：
 
 ```sh
-# 关闭设备指示灯，保留网口灯
-uci set ledcontrol.global.status_leds='0'
-uci set ledcontrol.global.net_leds='1'
-uci commit ledcontrol
-/etc/init.d/ledcontrol restart
+cd openwrt
+./scripts/feeds update -a
+./scripts/feeds install -a
+git clone https://github.com/Arthur97172/luci-app-ledcontrol.git package/luci-app-ledcontrol
+make menuconfig   # LuCI → Applications → luci-app-ledcontrol
+make package/luci-app-ledcontrol/compile V=s
 ```
-
-## 构建
 
 ### 使用 OpenWrt SDK
 
@@ -110,6 +85,42 @@ make package/luci-app-ledcontrol/compile V=s
 推送时还会把软件包发布到 Releases 页面，tag 与名称都直接读取 Makefile 里的
 `PKG_VERSION`/`PKG_RELEASE`，因此版本号只有一个来源，软件包与 tag 不会出现
 不一致。pull request 只构建，不会发布。
+
+## 工作原理
+
+本软件包由三个部分组成：
+
+| 组件 | 路径 | 作用 |
+| --- | --- | --- |
+| UCI 配置 | `/etc/config/ledcontrol` | 保存两个开关的状态（`1` = 开，`0` = 关）。 |
+| init 脚本 | `/etc/init.d/ledcontrol` | 开机时（`START=99`）把保存的状态写入各个 LED。 |
+| LuCI 视图 | `view/ledcontrol.js` | 提供两个开关，改动立即生效。 |
+
+点击 **保存并应用** 后，浏览器先提交 UCI 改动，再重启 init 脚本，因此 LED 立刻
+改变状态、无需重启；init 脚本每次开机都会再执行一遍，所以设置在重启后依然保持。
+
+两个开关的组合效果：
+
+| 设备指示灯 | 网口指示灯 | 结果 |
+| --- | --- | --- |
+| 开 | 开 | 全部点亮 |
+| 开 | 关 | 仅设备指示灯亮 |
+| 关 | 开 | 仅网口灯亮 |
+| 关 | 关 | 全部熄灭 |
+
+**判定规则**：LED 名字（`/sys/class/leds/` 下的目录名）中包含 `wan`、`lan`、
+`port`、`eth`、`sw` 或 `gphy` 的属于**网口指示灯**；其余（电源、Wi-Fi、USB 等）
+属于**设备指示灯**。Wi-Fi 灯（名字含 `wlan`）算设备指示灯。
+
+## 命令行
+
+```sh
+# 关闭设备指示灯，保留网口灯
+uci set ledcontrol.global.status_leds='0'
+uci set ledcontrol.global.net_leds='1'
+uci commit ledcontrol
+/etc/init.d/ledcontrol restart
+```
 
 ## 仓库结构
 

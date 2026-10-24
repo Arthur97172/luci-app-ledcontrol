@@ -12,34 +12,6 @@ keeps the chosen combination across reboots.
 * Supports both package formats: `.ipk` (opkg, OpenWrt 24.10) and `.apk`
   (apk-openssl, OpenWrt 25.12+).
 
-## How it works
-
-The package is made of three parts:
-
-| Component | Path | Purpose |
-| --- | --- | --- |
-| UCI config | `/etc/config/ledcontrol` | Stores the two toggles (`1` = on, `0` = off). |
-| init script | `/etc/init.d/ledcontrol` | Writes the stored state to the LEDs at boot (`START=99`). |
-| LuCI view | `view/ledcontrol.js` | Renders the two toggles and applies changes immediately. |
-
-Pressing **Save & Apply** commits the UCI change and then restarts the init
-script, so the LEDs change state right away - no reboot needed. The init script
-runs again on every boot, so the setting survives a reboot.
-
-What the two toggles do:
-
-| Status LEDs | Port LEDs | Result |
-| --- | --- | --- |
-| on | on | everything lit |
-| on | off | only the status LEDs lit |
-| off | on | only the port LEDs lit |
-| off | off | everything dark |
-
-**How a LED is classified**: a LED whose name - the directory name below
-`/sys/class/leds/` - contains `wan`, `lan`, `port`, `eth`, `sw` or `gphy` is a
-**network port LED**; every other one (power, Wi-Fi, USB, ...) is a **status
-LED**. Wi-Fi LEDs (names containing `wlan`) count as status LEDs.
-
 ## Installation
 
 Download the matching package from the [Releases](../../releases) page, copy it
@@ -70,17 +42,18 @@ it automatically.
 
 Then open **System → LED Control** in LuCI.
 
-## Command line
+## Building from source
+
+In an OpenWrt / ImmortalWrt source tree:
 
 ```sh
-# status LEDs off, network port LEDs kept on
-uci set ledcontrol.global.status_leds='0'
-uci set ledcontrol.global.net_leds='1'
-uci commit ledcontrol
-/etc/init.d/ledcontrol restart
+cd openwrt
+./scripts/feeds update -a
+./scripts/feeds install -a
+git clone https://github.com/Arthur97172/luci-app-ledcontrol.git package/luci-app-ledcontrol
+make menuconfig   # LuCI → Applications → luci-app-ledcontrol
+make package/luci-app-ledcontrol/compile V=s
 ```
-
-## Building
 
 ### With the OpenWrt SDK
 
@@ -117,6 +90,44 @@ On a push it also publishes the packages to the Releases page, taking both the
 tag and the release name from `PKG_VERSION`/`PKG_RELEASE` in the Makefile. The
 version therefore has a single source of truth and cannot drift from the tag.
 Pull requests build only - they never publish.
+
+## How it works
+
+The package is made of three parts:
+
+| Component | Path | Purpose |
+| --- | --- | --- |
+| UCI config | `/etc/config/ledcontrol` | Stores the two toggles (`1` = on, `0` = off). |
+| init script | `/etc/init.d/ledcontrol` | Writes the stored state to the LEDs at boot (`START=99`). |
+| LuCI view | `view/ledcontrol.js` | Renders the two toggles and applies changes immediately. |
+
+Pressing **Save & Apply** commits the UCI change and then restarts the init
+script, so the LEDs change state right away - no reboot needed. The init script
+runs again on every boot, so the setting survives a reboot.
+
+What the two toggles do:
+
+| Status LEDs | Port LEDs | Result |
+| --- | --- | --- |
+| on | on | everything lit |
+| on | off | only the status LEDs lit |
+| off | on | only the port LEDs lit |
+| off | off | everything dark |
+
+**How a LED is classified**: a LED whose name - the directory name below
+`/sys/class/leds/` - contains `wan`, `lan`, `port`, `eth`, `sw` or `gphy` is a
+**network port LED**; every other one (power, Wi-Fi, USB, ...) is a **status
+LED**. Wi-Fi LEDs (names containing `wlan`) count as status LEDs.
+
+## Command line
+
+```sh
+# status LEDs off, network port LEDs kept on
+uci set ledcontrol.global.status_leds='0'
+uci set ledcontrol.global.net_leds='1'
+uci commit ledcontrol
+/etc/init.d/ledcontrol restart
+```
 
 ## Repository layout
 
