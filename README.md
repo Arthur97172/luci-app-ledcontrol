@@ -11,6 +11,8 @@
 * 同时支持两种软件包格式：`.ipk`（opkg，OpenWrt 24.10）与 `.apk`
   （apk-openssl，OpenWrt 25.12+）。
 
+![luci-app-ledcontrol 界面截图](screenshot.png)
+
 ## 安装
 
 从 [Releases](../../releases) 页面下载对应的软件包，复制到路由器上并安装。

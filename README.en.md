@@ -12,6 +12,8 @@ keeps the chosen combination across reboots.
 * Supports both package formats: `.ipk` (opkg, OpenWrt 24.10) and `.apk`
   (apk-openssl, OpenWrt 25.12+).
 
+![luci-app-ledcontrol interface screenshot](screenshot.png)
+
 ## Installation
 
 Download the matching package from the [Releases](../../releases) page, copy it
